@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: authorization
+
+jwt:
+  jks:
+    path: classpath:keys/server.jks
+    alias: auth-key
+    password: password

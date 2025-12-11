@@ -1,7 +1,6 @@
 package restoauth.authorization.config;
 
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -16,13 +15,14 @@ import org.springframework.security.oauth2.server.authorization.client.InMemoryR
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
-import restoauth.authorization.key.KeyPairProvider;
+import restoauth.authorization.authentication.TokenResponseHandler;
+import restoauth.authorization.key.JWKProvider;
 
-import java.security.KeyPair;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 
@@ -31,7 +31,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthorizationServerConfig {
 
-    private final KeyPairProvider keyPairProvider;
+    private final List<JWKProvider> jwkProviders;
     private final AuthorizationProperties properties;
 
     @Bean
@@ -39,11 +39,12 @@ public class AuthorizationServerConfig {
         AuthorizationProperties.Url urlProperties = properties.getUrl();
 
         http
-                .authorizeHttpRequests(authorize
-                        -> authorize
+                .authorizeHttpRequests(authorize -> authorize
                         .anyRequest().authenticated()
                 )
                 .oauth2AuthorizationServer(oauth -> oauth
+                        .tokenEndpoint(token -> token
+                                .accessTokenResponseHandler(new TokenResponseHandler()))
                         .authorizationServerSettings(AuthorizationServerSettings.builder()
                                 .authorizationEndpoint(urlProperties.getToken())
                                 .jwkSetEndpoint(urlProperties.getKey())
@@ -56,33 +57,34 @@ public class AuthorizationServerConfig {
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
-        AuthorizationProperties.Client clientProperties = properties.getClient();
+        List<AuthorizationProperties.Client> clientsProperties = properties.getClients();
 
-        RegisteredClient.Builder clientBuilder = RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId(clientProperties.getClientId())
-                .clientSecret(clientProperties.getClientSecret())
-                .scope("message.read")
-                .scope("message.write")
-                .authorizationGrantType(new AuthorizationGrantType(clientProperties.getGrantTypes()));
+        List<RegisteredClient> clientList = clientsProperties.stream().map(clientProperties -> {
+            RegisteredClient.Builder clientBuilder = RegisteredClient.withId(UUID.randomUUID().toString())
+                    .clientId(clientProperties.getClientId())
+                    .clientSecret(clientProperties.getClientSecret())
+                    .authorizationGrantType(new AuthorizationGrantType(clientProperties.getGrantTypes()));
 
-        Arrays.stream(clientProperties.getScopes()).forEach(clientBuilder::scope);
+            Arrays.stream(clientProperties.getScopes()).forEach(clientBuilder::scope);
+            return clientBuilder.build();
+        }).toList();
+        return new InMemoryRegisteredClientRepository(clientList);
+    }
 
-        RegisteredClient client = clientBuilder.build();
-        return new InMemoryRegisteredClientRepository(client);
+    @Bean
+    OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+        return context -> {
+            String clientId = context.getRegisteredClient().getClientId();
+            context.getJwsHeader().keyId(clientId);
+        };
     }
 
     @Bean
     JWKSource<SecurityContext> jwkSource() {
-        KeyPair keyPair = keyPairProvider.getKeyPair();
-        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        JWKSet jwkSet = new JWKSet(jwkProviders.stream()
+                .map(JWKProvider::getKeyPair)
+                .toList());
 
-        RSAKey rsaKey = new RSAKey.Builder(publicKey)
-                .privateKey(privateKey)
-                .keyID(keyPairProvider.getKeyId())
-                .build();
-
-        JWKSet jwkSet = new JWKSet(rsaKey);
         return new ImmutableJWKSet<>(jwkSet);
     }
 }

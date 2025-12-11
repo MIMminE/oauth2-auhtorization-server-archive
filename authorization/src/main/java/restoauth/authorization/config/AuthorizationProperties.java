@@ -5,14 +5,16 @@ import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @ConfigurationProperties(prefix = "authorization")
 @Component
 @Getter
 public class AuthorizationProperties {
 
     private final Token token = new Token();
-    private final Jks jks = new Jks();
-    private final Client client = new Client();
+    private final List<Client> clients = new ArrayList<>();
     private final Url url = new Url();
 
     @Data
@@ -23,24 +25,25 @@ public class AuthorizationProperties {
     }
 
     @Data
-    public static class Jks {
-        private String path;
-        private String password;
-        private String alias;
-    }
-
-    @Data
     public static class Client {
         private String clientId;
         private String clientSecret;
         private String redirectUri;
         private String[] scopes;
         private String grantTypes;
+        private final Jwk jwk = new Jwk();
     }
 
     @Data
-    public static class Url{
+    public static class Url {
         private String token;
         private String key;
+    }
+
+    @Data
+    public static class Jwk {
+        private String jksPath;
+        private String jksPassword;
+        private String jksAlias;
     }
 }

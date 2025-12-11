@@ -1,9 +1,35 @@
 spring:
   application:
     name: authorization
+  profiles:
+    active: dev
 
-jwt:
+authorization:
+  token:
+    access-valid-seconds: 3600
+    refresh-valid-seconds: 1209600
+    use-refresh-token: true
+
+  client:
+    client-id: my-client
+    client-secret: my-secret
+    scopes:
+      - read
+      - write
+    grant-types: client_credentials
+
+  url:
+    token: /oauth/token
+    key: /.well_known/jwks.json
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+authorization:
   jks:
-    path: classpath:keys/server.jks
     alias: auth-key
-    password: password
+    path: ${JWT_JKS_PATH:}
+    password: ${JWT_JKS_PASSWORD:password}

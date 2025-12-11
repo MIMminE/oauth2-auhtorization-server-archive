@@ -1,0 +1,11 @@
+spring:
+  profiles: prod
+
+# 운영용: 외부 경로로부터 키스토어를 읽어옵니다. 권장: 환경변수로 전체 경로를 주입.
+authorization:
+  jks:
+    # 외부 파일 경로를 환경변수로 받습니다. 예: setx JWT_JKS_PATH "C:\keys\auth.jks"
+    path: ${JWT_JKS_PATH:}
+    # 운영에서는 반드시 환경변수로 패스워드를 주입하세요
+    password: ${JWT_JKS_PASSWORD}
+

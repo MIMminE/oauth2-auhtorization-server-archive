@@ -7,6 +7,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -18,7 +19,6 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
-import restoauth.authorization.authentication.TokenResponseHandler;
 import restoauth.authorization.key.JWKProvider;
 
 import java.util.Arrays;
@@ -31,11 +31,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthorizationServerConfig {
 
-    private final List<JWKProvider> jwkProviders;
     private final AuthorizationProperties properties;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider) throws Exception {
         AuthorizationProperties.Url urlProperties = properties.getUrl();
 
         http
@@ -44,7 +43,11 @@ public class AuthorizationServerConfig {
                 )
                 .oauth2AuthorizationServer(oauth -> oauth
                         .tokenEndpoint(token -> token
-                                .accessTokenResponseHandler(new TokenResponseHandler()))
+                                .authenticationProviders(provider -> {
+                                    provider.add(0, authenticationProvider);
+                                })
+//                                .accessTokenResponseHandler(new TokenResponseHandler())
+                        )
                         .authorizationServerSettings(AuthorizationServerSettings.builder()
                                 .authorizationEndpoint(urlProperties.getToken())
                                 .jwkSetEndpoint(urlProperties.getKey())
@@ -80,7 +83,7 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    JWKSource<SecurityContext> jwkSource() {
+    JWKSource<SecurityContext> jwkSource(List<JWKProvider> jwkProviders) {
         JWKSet jwkSet = new JWKSet(jwkProviders.stream()
                 .map(JWKProvider::getKeyPair)
                 .toList());

@@ -17,6 +17,7 @@ authorization:
         - read
         - write
       grant-types: client_credentials
+
       jwk:
         jks-path: classpath:keystore/auth.jks
         jks-password: password
